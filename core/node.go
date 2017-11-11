@@ -1,63 +1,106 @@
 package core
 
 import (
-	"go-otp/core/gpm"
-	"net"
 	"fmt"
+	"net"
 )
 
-type NodeArgs struct {
-	Name string
-	Host string
-	Port string
-}
+const (
+	NodeTypeNormal = iota
+	NodeTypeReceiver
+	NodeTypeHost
+)
 
 type Node struct {
-	gpm.Node
-	rpcCodec *gpm.RPCCodec
-	conn net.Conn
+	Type int
+	Name string
+	Host string
+	IP   string
+	Port int
+	ID   int64
 }
 
-func (n *Node) Start(args *NodeArgs) error {
-	hostName := args.Host + ":" + args.Port
-	conn, err := net.Dial("tcp", hostName)
+const (
+	RPCNodeUp = iota
+	RPCNodeDown
+)
+
+type RPCNodeStatus struct {
+	Status int
+	Node   Node
+}
+
+func init() {
+	RegisterType(Node{})
+	RegisterType(RPCNodeStatus{})
+}
+
+func (n *Node) GetID() int64 {
+	return n.ID
+}
+
+func (n *Node) GetName() string {
+	return n.Name
+}
+
+func (n *Node) SetID(id int64) {
+	n.ID = id
+}
+
+func (n *Node) SetName(name string) {
+	n.Name = name
+}
+
+type NodeArgs struct {
+	Node Node
+	Conn net.Conn
+}
+
+type GNode struct {
+	Node
+	Conn
+	gpm  GPM
+	Type int
+}
+
+func (n *GNode) Connect(node Node) error {
+	n.Node = node
+	addr := fmt.Sprintf("%s:%d", n.IP, n.Port)
+	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return err
 	}
-	n.Host = gpm.Host{
-		Host: args.Host,
-		Port: args.Port,
+	n.Init(conn)
+	data := &RPCData{
+		Async: false,
+		Data: &RPCNodeStatus{
+			Status: RPCNodeUp,
+			Node:   node,
+		},
 	}
-	n.Host.Name = hostName
-	n.Host.ID = 0
-	n.Name = args.Name
-	n.conn = conn
-	n.rpcCodec = gpm.NewRPCCodec(conn)
-	rpcData := gpm.RPCData{
-		Type: gpm.RpcTypeNodeUp,
-		Version: 1,
-		Data: n.Node,
-	}
-	err = n.rpcCodec.Encode(&rpcData)
-	fmt.Println(err)
-	n.Run(nil)
+	n.Send(data)
 	return nil
 }
 
-func (n *Node) Run(g *GPMD) error {
-	var err error = nil
-	for ;; {
-		rpcData := gpm.RPCData{}
-		err = n.rpcCodec.Decode(&rpcData)
-		fmt.Println(rpcData)
-		fmt.Println(err)
-		if err != nil {
-			if g != nil {
-				g.RemoveNode(&n.Node)
-			}
-			n.conn.Close()
-			break
-		}
-	}
+func (n *GNode) Start(gpm GPM) error {
+	n.gpm = gpm
+	err := n.Run(n)
 	return err
+}
+
+func (n *GNode) OnRPC(data *RPCData) (resp interface{}, err error) {
+	switch v := data.Data.(type) {
+	case RPCNodeStatus:
+		n.Node = v.Node
+		n.gpm.Add(n)
+	}
+	return nil, nil
+}
+
+func (n *GNode) OnAsyncRPC(data *RPCData) error {
+	return nil
+}
+
+func (n *GNode) OnClosed() error {
+	return nil
 }

@@ -1,1 +1,4 @@
 .idea
+*.exe
+test/gpmc
+gpmd/gpmd

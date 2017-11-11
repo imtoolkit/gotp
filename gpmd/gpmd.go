@@ -1,14 +1,13 @@
 package main
 
 import (
-	"go-otp/core"
 	"fmt"
-	"go-otp/core/gpm"
+	"go-otp/core"
 )
 
-func main(){
-	h := &gpm.Host{
-		Port: "12345",
+func main() {
+	h := core.Node{
+		Port: 12345,
 		Host: "localhost",
 	}
 	g, e := core.NewGPMD(h)
@@ -17,5 +16,5 @@ func main(){
 		return
 	}
 	g.Run()
-	select{}
+	select {}
 }

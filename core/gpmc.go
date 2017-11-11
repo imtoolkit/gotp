@@ -2,11 +2,10 @@ package core
 
 import (
 	"net"
-	"go-otp/core/gpm"
 )
 
 type GPMC struct {
-	gpm.GPM
+	BaseGPM
 	port string
 	conn net.Conn
 }

@@ -2,16 +2,29 @@ package main
 
 import (
 	"go-otp/core"
-	"fmt"
+	"os"
+	"strconv"
+	"strings"
 )
 
-func main(){
-	n := &core.Node{}
-	args := &core.NodeArgs{
-		Name: "test_gpmc1",
-		Port: "12345",
-		Host: "localhost",
+func main() {
+	names := strings.Split(os.Args[1], "@")
+	if len(names) < 2 {
+		return
 	}
-	err := n.Start(args)
-	fmt.Println(err)
+	var port = 12345
+	nodeName := names[0]
+	hostNames := strings.Split(names[1], ":")
+	hostName := hostNames[0]
+	if len(hostNames) > 1 {
+		port, _ = strconv.Atoi(hostNames[1])
+	}
+	n := core.Node{
+		Name: nodeName,
+		Host: hostName,
+		Port: port,
+	}
+	gn := &core.GNode{}
+	gn.Connect(n)
+	gn.Run(gn)
 }
