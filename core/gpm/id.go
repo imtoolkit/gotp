@@ -1,4 +1,4 @@
-package core
+package gpm
 
 import (
 	"sync/atomic"

@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
-	"go-otp/core"
+	"gotp/core/gpm"
+	"gotp/core/server"
 )
 
 func main() {
-	h := core.Node{
+	h := gpm.NodeConfig{
 		Port: 12345,
 		Host: "localhost",
 	}
-	g, e := core.NewGPMD(h)
+	g, e := server.NewGPMD(h)
 	if e != nil {
 		fmt.Println("create gpmd error: ", e.Error())
 		return

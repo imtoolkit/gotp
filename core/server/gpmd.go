@@ -1,39 +1,40 @@
-package core
+package server
 
 import (
 	"errors"
 	"fmt"
+	"gotp/core/gpm"
 	"log"
 	"net"
 )
 
 type GPMD struct {
-	Node
-	BaseGPM
-	Conn
+	gpm.Node
+	gpm.BaseGPM
+	gpm.Conn
 	conn net.Conn
-	im   IDMaker
+	im   gpm.IDMaker
 	ln   net.Listener
 }
 
-func NewGPMD(n Node) (*GPMD, error) {
+func NewGPMD(n gpm.NodeConfig) (*GPMD, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", n.Port))
 	if err != nil {
 		return nil, err
 	}
 	gpmd := &GPMD{
 		ln: ln,
-		im: IDMaker{},
+		im: gpm.IDMaker{},
 	}
 	gpmd.BaseGPM.Init()
-	gpmd.Node = n
+	gpmd.NodeConfig = n
 	gpmd.im.Init(0)
 	gpmd.ID = gpmd.im.Get()
 	gpmd.Add(gpmd)
 	return gpmd, nil
 }
 
-func (g *GPMD) RegisterNode(n *Node) error {
+func (g *GPMD) RegisterNode(n *gpm.Node) error {
 	name := n.Name
 
 	n1 := g.GetByName(name)
@@ -52,8 +53,8 @@ func (g *GPMD) Run() error {
 		if err != nil {
 			continue
 		}
-		n := &GNode{
-			Type: NodeTypeReceiver,
+		n := &gpm.GNode{
+			Type: gpm.NodeTypeReceiver,
 		}
 		n.Init(conn)
 		go n.Start(g)
@@ -61,15 +62,15 @@ func (g *GPMD) Run() error {
 	return nil
 }
 
-func (g *GPMD) Add(in IDName) error {
+func (g *GPMD) Add(in gpm.IDName) error {
 	in.SetID(g.im.Get())
 	g.BaseGPM.Add(in)
 	log.Println("-------on add ", in)
 	return nil
 }
 
-func (g *GPMD) OnRemove(in IDName) {
+func (g *GPMD) OnRemove(in gpm.IDName) {
 }
 
-func (g *GPMD) OnAdd(in IDName) {
+func (g *GPMD) OnAdd(in gpm.IDName) {
 }

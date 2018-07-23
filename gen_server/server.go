@@ -1,158 +1,132 @@
 package gen_server
 
 import (
-	"fmt"
-	"go-otp/core"
-	"reflect"
+	"sync"
 	"time"
 )
 
-const (
-	ReasonNormal = iota
-	ReasonShutdown
-	OptNormal
-	OptTerminate
-	ResultOk
-	ResultError
-)
-
-type Result int
-
-var g_type_refs = make(map[string]interface{})
-var g_server_refs = make(map[string]*ServerBase)
-
-var g_server_root = ServerBase{}
-
 type Server interface {
-	Init(args []interface{}) (result interface{})
-	Terminate(reason int, state interface{})
-	HandleCall(request interface{}, from interface{}, state interface{}) (result interface{})
-	HandleCast(request interface{}, state interface{}) (result interface{})
+	Init(args ...interface{}) Result
+	Terminate(reason Result) Result
+	HandleCall(from Server, request interface{}) Result
+	HandleCast(request interface{}) Result
+	HandleInfo(info interface{}) Result
 }
 
-type ServerBase struct {
-	core.Server
+type EventType string
+
+const (
+	EventCall      EventType = "call"
+	EventCast                = "cast"
+	EventTeminate            = "terminate"
+	EventTeminated           = "terminated"
+)
+
+type Event struct {
+	Type EventType
+	From Server
+	Data interface{}
+}
+
+func NewEvent(sender Server, tp EventType, data interface{}) *Event {
+	return &Event{
+		Type: tp,
+		From: sender,
+		Data: data,
+	}
+}
+
+type serverWrapper struct {
+	Server
+	children []Server
+	name     string
+	module   string
+	event    chan *Event
+}
+
+var manager *serverManager = nil
+
+type serverManager struct {
+	sync.RWMutex
+	Server
+	modules map[string]Creator
+	servers map[string]Server
 }
 
 func init() {
+	manager = &serverManager{
+		modules: make(map[string]Creator),
+		servers: make(map[string]Server),
+	}
 }
 
-func (g *ServerBase) loop() {
+func (m *serverManager) registerModule(module string, c Creator) Result {
+	m.Lock()
+	defer m.Unlock()
+	if _, ok := m.modules[module]; ok {
+		return ResultError
+	}
+	m.modules[module] = c
+	return ResultOk
 }
 
-func registerServer(name string, g *ServerBase) {
-	g_server_refs[name] = g
+func (m *serverManager) createServer(module, name string, args ...interface{}) (Result, Server) {
+	m.Lock()
+	defer m.Unlock()
+	if _, ok := m.servers[name]; ok {
+		return ResultError, nil
+	}
+	if create, ok := m.modules[module]; ok {
+		s := create()
+		r := s.Init(args...)
+		if r == ResultOk {
+			rs := &serverWrapper{
+				Server: s,
+				module: module,
+				name:   name,
+				event:  make(chan *Event, 1000),
+			}
+			m.servers[name] = rs
+		}
+		return r, s
+	}
+	return ResultError, nil
 }
 
-func getServer(serverRef string) *ServerBase {
-	return g_server_refs[serverRef]
+type Creator func() Server
+
+func Register(module string, c Creator) Result {
+	return manager.registerModule(module, c)
 }
 
-func registerType(name string, g interface{}) {
-	g_type_refs[name] = g
+func doCreate(from Server, module, name string, args ...interface{}) (Result, Server) {
+	return manager.createServer(module, name, args...)
 }
 
-func getType(module string) interface{} {
-	return g_type_refs[module]
+func Start(module, name string, options map[string]interface{}, args ...interface{}) Result {
+	return StartLink(nil, module, name, options, args...)
 }
 
-func Export(name string, g interface{}) {
-	registerType(name, g)
+func StartLink(link Server, module, name string, options map[string]interface{}, args ...interface{}) Result {
+	return nil
 }
 
-func Init(g *ServerBase, args []interface{}) (result interface{}) {
-	g.c = make(chan interface{})
-
-	go g.loop()
-
-	return
-}
-
-func (g *ServerBase) init(name string, args []interface{}) {
-}
-
-func doAbCast(from *ServerBase, nodes []string, serverName string, request interface{}) {
-
-}
-
-func doCall(from *ServerBase, serverRef string, request interface{}, timeout time.Duration) (replay interface{}) {
-	return
-}
-
-func doStart(from *ServerBase, serverName, module string, args []interface{}, options map[string]interface{}) (result interface{}) {
-	server := getType(module)
-	fmt.Println(reflect.ValueOf(server).NumMethod())
-
-	ret := reflect.ValueOf(server).MethodByName("Init").Call([]reflect.Value{reflect.ValueOf(args)})
-	return ret[0]
-}
-
-//--------------------
-func (g *ServerBase) AbCast2(name string, request interface{}) {
-	g.AbCast3([]string{}, name, request)
-}
-
-func (g *ServerBase) AbCast3(nodes []string, name string, request interface{}) {
-	doAbCast(g, nodes, name, request)
-}
-
-func (g *ServerBase) Call2(serverRef string, request interface{}) (replay interface{}) {
-	return g.Call3(serverRef, request, 0)
-}
-
-func (g *ServerBase) Call3(serverRef string, request interface{}, timeout time.Duration) (replay interface{}) {
-	return doCall(g, serverRef, request, timeout)
-}
-
-func (g *ServerBase) EnterLoop4(model string, options map[string]interface{},
-	state interface{}, timeout time.Duration) {
+func Cast(from Server, nodes []string, serverName string, request interface{}) {
 
 }
 
-func (g *ServerBase) EnterLoop5(model string, options map[string]interface{},
-	state interface{}, serverName string, timeout time.Duration) {
+func Call(from Server, serverName string, request interface{}, timeout ...time.Duration) Result {
+	return nil
+}
+
+func MultiCall(from Server, nodes []string, module string, request interface{}, timeout ...time.Duration) Result {
+	return nil
+}
+
+func Stop(from Server, s Server, reason string, timeout ...time.Duration) {
 
 }
 
-func (g *ServerBase) MultiCall2(name string, request interface{}) (result interface{}) {
-	return
-}
-
-func (g *ServerBase) MultiCall3(nodes []string, name string, request interface{}) (result interface{}) {
-	return
-}
-
-func (g *ServerBase) MultiCall4(nodes []string, name string, request interface{}, timeout time.Duration) (result interface{}) {
-	return
-}
-
-func (g *ServerBase) Reply2(client interface{}, replay interface{}) (result interface{}) {
-	return
-}
-
-func (g *ServerBase) Start3(module string, args []interface{}, options map[string]interface{}) (result interface{}) {
-	serverName := module
-	return g.Start4(serverName, module, args, options)
-}
-
-func (g *ServerBase) Start4(serverName string, module string, args []interface{},
-	options map[string]interface{}) (result interface{}) {
-	return doStart(g, serverName, module, args, options)
-}
-
-func (g *ServerBase) StartLink3(module string, args []interface{}, options map[string]interface{}) (result interface{}) {
-	return
-}
-
-func (g *ServerBase) StartLink4(serverName string, module string, args map[string]interface{},
-	options map[string]interface{}) (result interface{}) {
-	return
-}
-
-func (g *ServerBase) Stop(server interface{}) {
-
-}
-
-func (g *ServerBase) Stop3(server interface{}, reason string, timeout time.Duration) {
-
+func Reply(from Server, to Server, replay interface{}) Result {
+	return nil
 }

@@ -1,4 +1,4 @@
-package core
+package gpm
 
 import (
 	"fmt"
@@ -12,12 +12,15 @@ const (
 )
 
 type Node struct {
+	BaseIDName
+	NodeConfig
+}
+
+type NodeConfig struct {
 	Type int
-	Name string
 	Host string
 	IP   string
 	Port int
-	ID   int64
 }
 
 const (
@@ -35,22 +38,6 @@ func init() {
 	RegisterType(RPCNodeStatus{})
 }
 
-func (n *Node) GetID() int64 {
-	return n.ID
-}
-
-func (n *Node) GetName() string {
-	return n.Name
-}
-
-func (n *Node) SetID(id int64) {
-	n.ID = id
-}
-
-func (n *Node) SetName(name string) {
-	n.Name = name
-}
-
 type NodeArgs struct {
 	Node Node
 	Conn net.Conn
@@ -63,8 +50,13 @@ type GNode struct {
 	Type int
 }
 
-func (n *GNode) Connect(node Node) error {
-	n.Node = node
+func NewGNode(cfg NodeConfig) *GNode {
+	node := &GNode{}
+	node.NodeConfig = cfg
+	return node
+}
+
+func (n *GNode) Connect() error {
 	addr := fmt.Sprintf("%s:%d", n.IP, n.Port)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -75,15 +67,15 @@ func (n *GNode) Connect(node Node) error {
 		Async: false,
 		Data: &RPCNodeStatus{
 			Status: RPCNodeUp,
-			Node:   node,
+			Node:   n.Node,
 		},
 	}
 	n.Send(data)
 	return nil
 }
 
-func (n *GNode) Start(gpm GPM) error {
-	n.gpm = gpm
+func (n *GNode) Start(g GPM) error {
+	n.gpm = g
 	err := n.Run(n)
 	return err
 }

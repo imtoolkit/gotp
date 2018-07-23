@@ -1,7 +1,7 @@
 package main
 
 import (
-	"go-otp/core"
+	"gotp/core/gpm"
 	"os"
 	"strconv"
 	"strings"
@@ -19,12 +19,12 @@ func main() {
 	if len(hostNames) > 1 {
 		port, _ = strconv.Atoi(hostNames[1])
 	}
-	n := core.Node{
-		Name: nodeName,
+	cfg := gpm.NodeConfig{
 		Host: hostName,
 		Port: port,
 	}
-	gn := &core.GNode{}
-	gn.Connect(n)
+	gn := gpm.NewGNode(cfg)
+	gn.SetName(nodeName)
+	gn.Connect()
 	gn.Run(gn)
 }

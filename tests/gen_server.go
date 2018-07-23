@@ -1,44 +1,38 @@
 package main
 
 import (
-	"fmt"
-	"go-otp/gen_server"
-	"reflect"
+	"gotp/gen_server"
 )
 
 func init() {
-	gen_server.Export("test_server", TestServer{})
+	gen_server.Register("test_server", func() gen_server.Server {
+		return &TestServer{}
+	})
 }
 
-type TestServer struct {
-	gen_server.ServerBase
+type TestServer struct{}
+
+func (t *TestServer) Init(args ...interface{}) gen_server.Result {
+	return gen_server.ResultOk
 }
 
-func (t *TestServer) Init(args []interface{}) (result interface{}) {
-	t.ServerBase.Init(args)
-	gen_server.Init(&t.ServerBase, args)
-	return "hello"
+func (t *TestServer) Terminate(reason gen_server.Result) gen_server.Result {
+	return nil
 }
 
-func (t *TestServer) Terminate(reason int, state interface{}) {
-
+func (t *TestServer) HandleCall(from gen_server.Server, request interface{}) gen_server.Result {
+	return nil
 }
 
-func (t *TestServer) HandleCall(request interface{}, from interface{}, state interface{}) (result interface{}) {
-	fmt.Println(request, from, state)
-	return
+func (t *TestServer) HandleCast(request interface{}) gen_server.Result {
+	return nil
 }
 
-func (t *TestServer) HandleCast(request interface{}, state interface{}) (result interface{}) {
-	return
+func (t *TestServer) HandleInfo(info interface{}) gen_server.Result {
+	return nil
 }
+
 func main() {
-	var g = TestServer{}
-	var i interface{}
-	i = g
-	fmt.Println(reflect.ValueOf(i).NumMethod())
-	g.Init([]interface{}{})
-	g.Start4("test_server_1", "main.TestServer", []interface{}{"test_server_1"}, map[string]interface{}{})
-	replay := g.Call2("test_server_1", "hello")
-	fmt.Println(replay)
+	r, s := gen_server.Create(nil, "test_server", "test_server_1", 111)
+	gen_server.Start(nil)
 }
